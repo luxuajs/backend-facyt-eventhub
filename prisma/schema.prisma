@@ -1,0 +1,108 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Rol {
+  ROOT
+  COORDINADOR
+  SOLICITANTE
+}
+
+enum TipoEspacio {
+  AUDITORIO
+  LABORATORIO_DOCENCIA
+  LABORATORIO_INVESTIGACION
+  SALON
+}
+
+enum EstadoEspacio {
+  ACTIVO
+  MANTENIMIENTO
+  INHABILITADO
+}
+
+enum EstadoEvento {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  CANCELADO
+}
+
+model Usuario {
+  id         String      @id @default(uuid())
+  nombre     String
+  email      String      @unique
+  password   String
+  rol        Rol         @default(SOLICITANTE)
+  activo     Boolean     @default(false)
+  escuelaId  String?
+  escuela    Escuela?    @relation(fields: [escuelaId], references: [id])
+  eventos    Evento[]
+  auditorias Auditoria[]
+  createdAt  DateTime    @default(now())
+}
+
+model Escuela {
+  id       String    @id @default(uuid())
+  nombre   String    // Computación, Química, Física, Biología, Matemática
+  espacios Espacio[]
+  usuarios Usuario[]
+}
+
+model Espacio {
+  id             String        @id @default(uuid())
+  nombre         String        // Ej: Auditorio Ninoska Maneiro, Lab SunRay 1
+  tipo           TipoEspacio
+  capacidad      Int
+  diasPermitidos String        // "MARTES,JUEVES" o "LUNES,MARTES,MIERCOLES,JUEVES,VIERNES"
+  horaApertura   String        // "08:00"
+  horaCierre     String        // "17:00"
+  estado         EstadoEspacio @default(ACTIVO)
+  escuelaId      String?
+  escuela        Escuela?      @relation(fields: [escuelaId], references: [id])
+  eventos        Evento[]
+}
+
+model Evento {
+  id                  String       @id @default(uuid())
+  titulo              String
+  descripcion         String?
+  tipo                String       // Clase Teórica, Lab, Defensa Tesis, Taller, etc.
+  prioridad           Int          // 1 a 5 según Matriz
+  fecha               DateTime
+  horaInicio          String       // "10:00"
+  horaFin             String       // "12:00"
+  asistentesEstimados Int
+  estado              EstadoEvento @default(PENDIENTE)
+  sugerenciaIA        String?      // Recomendación generada por la IA
+  
+  espacioId           String
+  espacio             Espacio      @relation(fields: [espacioId], references: [id])
+  usuarioId           String
+  usuario             Usuario      @relation(fields: [usuarioId], references: [id])
+  
+  createdAt           DateTime     @default(now())
+}
+
+model Auditoria {
+  id        String   @id @default(uuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  accion    String   // Ej: "APROBO_EVENTO", "CAMBIO_ESTADO_ESPACIO"
+  detalles  String
+  timestamp DateTime @default(now())
+}
+
+model ResetCode {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  tipo      String   // "VERIFICACION", "INVITACION", "RECUPERACION"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
