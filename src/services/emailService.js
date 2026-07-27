@@ -1,35 +1,57 @@
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 465,
-  secure: process.env.EMAIL_PORT === '465', // true para 465, false para otros puertos (como 2525 u 80 con STARTTLS)
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    // Evita errores de handshake en algunos servidores en la nube
-    rejectUnauthorized: false
-  }
-});
-
-// Función auxiliar para enviar correos
+// Función auxiliar para enviar correos usando la API HTTP de Mailjet (Puerto 443 HTTPS)
 async function sendMail({ to, subject, html }) {
+  const apiKey = process.env.EMAIL_USER; // API Key de Mailjet
+  const apiSecret = process.env.EMAIL_PASS; // Secret Key de Mailjet
+  const fromEmail = process.env.EMAIL_FROM || 'juasanabriaalfa08@gmail.com'; // Tu Gmail verificado en Mailjet
+
+  if (!apiKey || !apiSecret) {
+    console.error('[Email] Error: EMAIL_USER o EMAIL_PASS no están configuradas.');
+    throw new Error('Servicio de correo no configurado.');
+  }
+
   try {
-    const info = await transporter.sendMail({
-      from: `"FaCyT EventHub" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
+    const authHeader = 'Basic ' + Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+
+    const response = await fetch('https://api.mailjet.com/v3.1/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        Messages: [
+          {
+            From: {
+              Email: fromEmail,
+              Name: 'FaCyT EventHub',
+            },
+            To: [
+              {
+                Email: to,
+              },
+            ],
+            Subject: subject,
+            HTMLPart: html,
+          },
+        ],
+      }),
     });
-    console.log(`[Email] Correo enviado a ${to}. ID: ${info.messageId}`);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('[Email] Error en la API de Mailjet:', data);
+      throw new Error('Error al enviar el correo transaccional');
+    }
+
+    console.log(`[Email] Correo enviado a ${to} exitosamente vía Mailjet API.`);
     return true;
   } catch (error) {
-    console.error('[Email] Error enviando correo SMTP:', error);
+    console.error('[Email] Error enviando correo vía Mailjet API:', error.message);
     throw new Error('Error al enviar el correo transaccional');
   }
 }
