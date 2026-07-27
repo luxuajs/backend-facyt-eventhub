@@ -71,7 +71,6 @@ async function main() {
       horaApertura: '08:00',
       horaCierre: '16:00',
       estado: 'ACTIVO',
-      materias: 'Redes y Telecomunicaciones,Sistemas Operativos,Arquitectura del Computador',
       escuelaId: compId
     }
   });
@@ -84,7 +83,6 @@ async function main() {
       horaApertura: '08:00',
       horaCierre: '16:00',
       estado: 'ACTIVO',
-      materias: 'Bases de Datos,Programación,Estructuras de Datos',
       escuelaId: compId
     }
   });
