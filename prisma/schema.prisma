@@ -28,6 +28,7 @@ enum EstadoEspacio {
 
 enum EstadoEvento {
   PENDIENTE
+  PROPUESTA_CAMBIO
   APROBADO
   RECHAZADO
   CANCELADO
@@ -52,20 +53,50 @@ model Escuela {
   nombre   String    // Computación, Química, Física, Biología, Matemática
   espacios Espacio[]
   usuarios Usuario[]
+  areas    Area[]
+  materias Materia[]
+}
+
+model Area {
+  id          String   @id @default(uuid())
+  nombre      String
+  descripcion String?
+  activo      Boolean  @default(true)
+  escuelaId   String?
+  escuela     Escuela? @relation(fields: [escuelaId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model Materia {
+  id          String    @id @default(uuid())
+  nombre      String
+  codigo      String?
+  activo      Boolean   @default(true)
+  escuelaId   String?
+  escuela     Escuela?  @relation(fields: [escuelaId], references: [id])
+  espacioId   String?
+  espacio     Espacio?  @relation(fields: [espacioId], references: [id])
+  createdAt   DateTime  @default(now())
 }
 
 model Espacio {
-  id             String        @id @default(uuid())
-  nombre         String        // Ej: Auditorio Ninoska Maneiro, Lab SunRay 1
-  tipo           TipoEspacio
-  capacidad      Int
-  diasPermitidos String        // "MARTES,JUEVES" o "LUNES,MARTES,MIERCOLES,JUEVES,VIERNES"
-  horaApertura   String        // "08:00"
-  horaCierre     String        // "17:00"
-  estado         EstadoEspacio @default(ACTIVO)
-  escuelaId      String?
-  escuela        Escuela?      @relation(fields: [escuelaId], references: [id])
-  eventos        Evento[]
+  id               String        @id @default(uuid())
+  nombre           String        // Ej: Auditorio Ninoska Maneiro, Lab SunRay 1
+  tipo             TipoEspacio
+  capacidad        Int
+  diasPermitidos   String        // "MARTES,JUEVES" o "LUNES,MARTES,MIERCOLES,JUEVES,VIERNES"
+  horaApertura     String        // "08:00"
+  horaCierre       String        // "17:00"
+  estado           EstadoEspacio @default(ACTIVO)
+  inhabilitadoDesde DateTime?
+  inhabilitadoHasta DateTime?
+  inhabilitadoIndeterminado Boolean @default(false)
+  motivoInhabilitacion String?
+  escuelaId        String?
+  escuela          Escuela?      @relation(fields: [escuelaId], references: [id])
+  eventos          Evento[]      @relation("EspacioPrincipal")
+  eventosSugeridos Evento[]      @relation("EspacioSugerido")
+  materias         Materia[]
 }
 
 model Evento {
@@ -73,6 +104,7 @@ model Evento {
   titulo              String
   descripcion         String?
   tipo                String       // Clase Teórica, Lab, Defensa Tesis, Taller, etc.
+  materia             String?      // Materia o Asignatura (para laboratorios o clases)
   prioridad           Int          // 1 a 5 según Matriz
   fecha               DateTime
   horaInicio          String       // "10:00"
@@ -80,9 +112,15 @@ model Evento {
   asistentesEstimados Int
   estado              EstadoEvento @default(PENDIENTE)
   sugerenciaIA        String?      // Recomendación generada por la IA
+  motivoPropuesta     String?      // Motivo del cambio de espacio propuesto por el coordinador
   
   espacioId           String
-  espacio             Espacio      @relation(fields: [espacioId], references: [id])
+  espacio             Espacio      @relation("EspacioPrincipal", fields: [espacioId], references: [id])
+  espacioSugeridoId   String?
+  espacioSugerido     Espacio?     @relation("EspacioSugerido", fields: [espacioSugeridoId], references: [id])
+  fechaSugerida       DateTime?
+  horaInicioSugerida  String?
+  horaFinSugerida     String?
   usuarioId           String
   usuario             Usuario      @relation(fields: [usuarioId], references: [id])
   

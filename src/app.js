@@ -12,6 +12,9 @@ import authRoutes from './routes/authRoutes.js';
 import eventoRoutes from './routes/eventoRoutes.js';
 import coordinadorRoutes from './routes/coordinadorRoutes.js';
 import auditoriaRoutes from './routes/auditoriaRoutes.js';
+import espacioRoutes from './routes/espacioRoutes.js';
+import areaRoutes from './routes/areaRoutes.js';
+import materiaRoutes from './routes/materiaRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +28,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/eventos', eventoRoutes);
 app.use('/api/coordinador', coordinadorRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
+app.use('/api/espacios', espacioRoutes);
+app.use('/api/areas', areaRoutes);
+app.use('/api/materias', materiaRoutes);
 
 // Endpoint de verificación de salud
 app.get('/api/health', (req, res) => {

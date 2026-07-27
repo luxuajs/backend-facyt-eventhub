@@ -47,102 +47,65 @@ async function main() {
   console.log(`Usuario ROOT creado con éxito: ${rootEmail} (Password: root1234)`);
 
   // 3. Crear Espacios Físicos (según PRD.md)
-  // 3a. Auditorio Ninoska Maneiro (Martes y Jueves, 08:00 - 17:00)
+  // 3a. Auditorio Ninoska Maneiro (Lunes a Viernes, 08:00 - 17:00)
   await prisma.espacio.create({
     data: {
       nombre: 'Auditorio Ninoska Maneiro',
       tipo: 'AUDITORIO',
       capacidad: 150,
-      diasPermitidos: 'MARTES,JUEVES',
+      diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
       horaApertura: '08:00',
       horaCierre: '17:00',
       estado: 'ACTIVO'
     }
   });
 
-  // 3b. Laboratorios SunRay 1 a 4 (Lunes a Viernes, 08:00 - 16:00, Computación)
+  // 3b. Laboratorios de Computación N° 1 y N° 2 (Lunes a Viernes, 08:00 - 16:00, Computación)
   const compId = escuelas['Computación'].id;
-  for (let i = 1; i <= 4; i++) {
-    await prisma.espacio.create({
-      data: {
-        nombre: `Lab. Thin Client SunRay ${i}`,
-        tipo: 'LABORATORIO_DOCENCIA',
-        capacidad: 30,
-        diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
-        horaApertura: '08:00',
-        horaCierre: '16:00',
-        estado: 'ACTIVO',
-        escuelaId: compId
-      }
-    });
-  }
-
-  // 3c. Laboratorios VIT 1 y 2 (Lunes a Viernes, 08:00 - 16:00, Abiertos/Sin escuela)
   await prisma.espacio.create({
     data: {
-      nombre: 'Lab. Escritorio VIT 1 (OPSU)',
+      nombre: 'Laboratorio de Computación N° 1 (Redes y Sistemas)',
       tipo: 'LABORATORIO_DOCENCIA',
       capacidad: 30,
       diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
       horaApertura: '08:00',
       horaCierre: '16:00',
-      estado: 'ACTIVO'
+      estado: 'ACTIVO',
+      materias: 'Redes y Telecomunicaciones,Sistemas Operativos,Arquitectura del Computador',
+      escuelaId: compId
     }
   });
   await prisma.espacio.create({
     data: {
-      nombre: 'Lab. Escritorio VIT 2 (OPSU)',
+      nombre: 'Laboratorio de Computación N° 2 (Bases de Datos y Programación)',
       tipo: 'LABORATORIO_DOCENCIA',
       capacidad: 15,
       diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
       horaApertura: '08:00',
       horaCierre: '16:00',
-      estado: 'ACTIVO'
+      estado: 'ACTIVO',
+      materias: 'Bases de Datos,Programación,Estructuras de Datos',
+      escuelaId: compId
     }
   });
 
-  // 3d. Aulas/Salones (3 por escuela)
+  // 3d. Aulas/Salones (1 por escuela con capacidad aleatoria, total 5)
   const escuelasNombres = ['Computación', 'Química', 'Física', 'Biología', 'Matemática'];
   for (const escName of escuelasNombres) {
     const escId = escuelas[escName].id;
-    for (let i = 1; i <= 3; i++) {
-      await prisma.espacio.create({
-        data: {
-          nombre: `Aula Pequeña ${i} (${escName})`,
-          tipo: 'SALON',
-          capacidad: 20,
-          diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
-          horaApertura: '07:00',
-          horaCierre: '18:00',
-          estado: 'ACTIVO',
-          escuelaId: escId
-        }
-      });
-      await prisma.espacio.create({
-        data: {
-          nombre: `Aula Mediana ${i} (${escName})`,
-          tipo: 'SALON',
-          capacidad: 40,
-          diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
-          horaApertura: '07:00',
-          horaCierre: '18:00',
-          estado: 'ACTIVO',
-          escuelaId: escId
-        }
-      });
-      await prisma.espacio.create({
-        data: {
-          nombre: `Aula Magna ${i} (${escName})`,
-          tipo: 'SALON',
-          capacidad: 80,
-          diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
-          horaApertura: '07:00',
-          horaCierre: '18:00',
-          estado: 'ACTIVO',
-          escuelaId: escId
-        }
-      });
-    }
+    const randomCapacity = Math.floor(Math.random() * 81) + 20; // 20 - 100
+    await prisma.espacio.create({
+      data: {
+        nombre: `Aula ${escName}`,
+        tipo: 'SALON',
+        capacidad: randomCapacity,
+        diasPermitidos: 'LUNES,MARTES,MIERCOLES,JUEVES,VIERNES',
+        horaApertura: '07:00',
+        horaCierre: '18:00',
+        estado: 'ACTIVO',
+        escuelaId: escId
+      }
+    });
   }
 
   // 3e. Laboratorios de Investigación (Uso exclusivo por escuela)

@@ -98,3 +98,81 @@ export async function sendResetPasswordCode(email, token, frontendUrl = 'http://
     html,
   });
 }
+
+export async function sendSpaceMaintenanceNotification({ email, usuarioNombre, eventoTitulo, espacioNombre, fecha, horaInicio, horaFin, motivo }) {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h2 style="color: #dc2626; text-align: center;">Notificación de Mantenimiento / Contingencia</h2>
+      <p>Estimado(a) <strong>${usuarioNombre}</strong>,</p>
+      <p>Le informamos que la reserva de su evento <strong>"${eventoTitulo}"</strong> programada en el espacio <strong>"${espacioNombre}"</strong> para la fecha <strong>${fecha}</strong> (${horaInicio} - ${horaFin}) ha tenido que ser <strong style="color: #dc2626;">CANCELADA POR CONTINGENCIA</strong>.</p>
+      <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; font-weight: bold; color: #991b1b;">Motivo del Mantenimiento / Inhabilitación:</p>
+        <p style="margin: 4px 0 0 0; color: #7f1d1d;">${motivo || 'Mantenimiento preventivo / correctivo de infraestructura'}</p>
+      </div>
+      <p>Lamentamos las molestias ocasionadas. Le sugerimos ingresar al sistema para solicitar un espacio o bloque de tiempo alternativo.</p>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #64748b; text-align: center;">FaCyT EventHub - Coordinación de Espacios Físicos</p>
+    </div>
+  `;
+  try {
+    await sendMail({
+      to: email,
+      subject: `[IMPORTANTE] Cancelación por Mantenimiento - Evento "${eventoTitulo}"`,
+      html,
+    });
+  } catch (error) {
+    console.error(`[Email] No se pudo enviar notificación de mantenimiento a ${email}:`, error.message);
+  }
+}
+
+export async function sendDeleteCoordinatorCode(email, coordinatorName, code) {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h2 style="color: #dc2626; text-align: center;">Confirmación de Eliminación de Coordinador</h2>
+      <p>Hola,</p>
+      <p>Se ha solicitado la eliminación del perfil del coordinador <strong>${coordinatorName}</strong> en FaCyT EventHub.</p>
+      <p>Para confirmar esta acción, ingresa el siguiente código de confirmación de 6 dígitos en el sistema. Este código expira en 15 minutos:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 5px; background-color: #fef2f2; padding: 10px 20px; border-radius: 6px; border: 1px solid #fca5a5; color: #991b1b;">${code}</span>
+      </div>
+      <p>Si no realizaste esta solicitud, ignora este mensaje y verifica la seguridad de tu cuenta ROOT.</p>
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #64748b; text-align: center;">FaCyT EventHub - Seguridad y Administración</p>
+    </div>
+  `;
+  return sendMail({
+    to: email,
+    subject: `Código de Confirmación: Eliminación de Coordinador (${coordinatorName}) - FaCyT EventHub`,
+    html,
+  });
+}
+
+export async function sendReassignmentProposalNotification({ email, usuarioNombre, eventoTitulo, espacioOriginalNombre, espacioPropuestoNombre, sugerenciaIA, linkRespuesta }) {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h2 style="color: #ea580c; text-align: center;">Propuesta de Reasignación de Espacio</h2>
+      <p>Estimado(a) <strong>${usuarioNombre}</strong>,</p>
+      <p>Le informamos que el espacio <strong>"${espacioOriginalNombre}"</strong> ha sido inhabilitado, por lo cual su evento <strong>"${eventoTitulo}"</strong> se ha visto afectado.</p>
+      <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; font-weight: bold; color: #9a3412;">Mensaje del Sistema:</p>
+        <p style="margin: 4px 0 0 0; color: #9a3412;">${sugerenciaIA}</p>
+      </div>
+      ${espacioPropuestoNombre ? `<p>Para aceptar o rechazar esta propuesta, por favor acceda al siguiente enlace:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${linkRespuesta}" style="background-color: #ea580c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Revisar Propuesta</a>
+      </div>` : `<p>Lamentablemente no se encontró una alternativa disponible. Ingrese al sistema para reprogramar su evento.</p>`}
+      <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+      <p style="font-size: 12px; color: #64748b; text-align: center;">FaCyT EventHub - Coordinación de Espacios Físicos</p>
+    </div>
+  `;
+  try {
+    await sendMail({
+      to: email,
+      subject: `Propuesta de Reasignación - Evento "${eventoTitulo}"`,
+      html,
+    });
+  } catch (error) {
+    console.error(`[Email] No se pudo enviar notificación de propuesta a ${email}:`, error.message);
+  }
+}
+

@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import {
   crearEvento,
+  obtenerSugerenciasEspacio,
   actualizarEstadoEvento,
+  proponerCambioEspacio,
+  responderPropuestaCambio,
+  editarEvento,
   getMisEventos,
   getCalendario,
   getEspacios,
-  getEscuelas
+  getEscuelas,
+  obtenerPromocionEvento,
+  responderPropuesta
 } from '../controllers/eventoController.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.js';
 
@@ -17,10 +23,16 @@ router.get('/espacios', getEspacios);
 router.get('/escuelas', getEscuelas);
 
 // Rutas Protegidas (Solicitantes y superiores)
+router.post('/sugerir-espacios', authenticateToken, requireRole(['SOLICITANTE', 'COORDINADOR', 'ROOT']), obtenerSugerenciasEspacio);
 router.post('/', authenticateToken, requireRole(['SOLICITANTE', 'COORDINADOR', 'ROOT']), crearEvento);
 router.get('/mis-eventos', authenticateToken, requireRole(['SOLICITANTE', 'COORDINADOR', 'ROOT']), getMisEventos);
+router.get('/:id/promocion', authenticateToken, requireRole(['SOLICITANTE', 'COORDINADOR', 'ROOT']), obtenerPromocionEvento);
+router.put('/:id', authenticateToken, requireRole(['SOLICITANTE', 'COORDINADOR', 'ROOT']), editarEvento);
+router.patch('/:id/responder-propuesta', authenticateToken, requireRole(['SOLICITANTE', 'COORDINADOR', 'ROOT']), responderPropuestaCambio);
+router.post('/:id/responder-propuesta', authenticateToken, requireRole(['SOLICITANTE', 'COORDINADOR', 'ROOT']), responderPropuesta);
 
-// Rutas de Aprobación (Solo Coordinadores y ROOT)
+// Rutas de Aprobación y Propuesta (Solo Coordinadores y ROOT)
 router.patch('/:id/estado', authenticateToken, requireRole(['COORDINADOR', 'ROOT']), actualizarEstadoEvento);
+router.patch('/:id/proponer-cambio', authenticateToken, requireRole(['COORDINADOR', 'ROOT']), proponerCambioEspacio);
 
 export default router;

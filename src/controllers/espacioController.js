@@ -1,0 +1,187 @@
+import prisma from '../config/db.js';
+import { sendSpaceMaintenanceNotification, sendReassignmentProposalNotification } from '../services/emailService.js';
+import { buscarReasignacionEspacio } from '../services/eventoService.js';
+import { generarReasignacionInhabilitacion } from '../services/geminiService.js';
+
+// Obtener catálogo completo de espacios con su escuela
+export async function getEspacios(req, res) {
+  try {
+    const espacios = await prisma.espacio.findMany({
+      include: { escuela: true, materias: true },
+      orderBy: { nombre: 'asc' }
+    });
+    return res.status(200).json(espacios);
+  } catch (error) {
+    console.error('[EspacioCtrl] Error al obtener espacios:', error);
+    return res.status(500).json({ error: 'Error interno al obtener los espacios.' });
+  }
+}
+
+// Cambiar estado operativo de un espacio (ACTIVO, MANTENIMIENTO, INHABILITADO)
+export async function actualizarEstadoEspacio(req, res) {
+  const { id } = req.params;
+  const { estado, motivo, duracionTipo, cantidadDias } = req.body;
+
+  if (!['ACTIVO', 'MANTENIMIENTO', 'INHABILITADO'].includes(estado)) {
+    return res.status(400).json({ error: 'El estado debe ser ACTIVO, MANTENIMIENTO o INHABILITADO.' });
+  }
+
+  if (['MANTENIMIENTO', 'INHABILITADO'].includes(estado) && (!motivo || !motivo.trim())) {
+    return res.status(400).json({ error: 'Debe especificar el motivo del mantenimiento o inhabilitación.' });
+  }
+
+  try {
+    const coordinator = req.user;
+
+    const espacioExistente = await prisma.espacio.findUnique({
+      where: { id }
+    });
+
+    if (!espacioExistente) {
+      return res.status(404).json({ error: 'El espacio especificado no existe.' });
+    }
+
+    const hoy = new Date();
+    hoy.setUTCHours(0, 0, 0, 0);
+
+    let inhabilitadoDesde = null;
+    let inhabilitadoHasta = null;
+    let inhabilitadoIndeterminado = false;
+
+    if (estado === 'INHABILITADO') {
+      inhabilitadoDesde = new Date();
+      if (duracionTipo === 'INDETERMINADO') {
+        inhabilitadoIndeterminado = true;
+      } else if (duracionTipo === 'DIAS' && cantidadDias) {
+        inhabilitadoHasta = new Date(inhabilitadoDesde);
+        inhabilitadoHasta.setDate(inhabilitadoHasta.getDate() + parseInt(cantidadDias, 10));
+      }
+    }
+
+    let dateFilter = { gte: hoy };
+    if (estado === 'INHABILITADO') {
+       if (inhabilitadoHasta) {
+          dateFilter = { gte: inhabilitadoDesde, lte: inhabilitadoHasta };
+       } else {
+          dateFilter = { gte: inhabilitadoDesde };
+       }
+    }
+
+    // Buscar reservas futuras o vigentes en estado APROBADO o PENDIENTE
+    const eventosAfectados = await prisma.evento.findMany({
+      where: {
+        espacioId: id,
+        estado: { in: ['APROBADO', 'PENDIENTE'] },
+        fecha: dateFilter
+      },
+      include: {
+        usuario: { select: { nombre: true, email: true, escuelaId: true } },
+        espacio: true
+      }
+    });
+
+    // Transacción ACID para actualizar espacio, cancelar eventos afectados y registrar auditoría
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Actualizar estado del espacio
+      const espacioActualizado = await tx.espacio.update({
+        where: { id },
+        data: { 
+          estado,
+          motivoInhabilitacion: estado === 'INHABILITADO' ? motivo : null,
+          inhabilitadoDesde,
+          inhabilitadoHasta,
+          inhabilitadoIndeterminado
+        }
+      });
+
+      let eventosProcesadosCount = 0;
+
+      // 2. Si el espacio pasa a mantenimiento o inhabilitado, procesar eventos afectados
+      if (['MANTENIMIENTO', 'INHABILITADO'].includes(estado) && eventosAfectados.length > 0) {
+        eventosProcesadosCount = eventosAfectados.length;
+        
+        for (const evt of eventosAfectados) {
+           if (estado === 'INHABILITADO') {
+              // IA reassignment flow
+              const candidatos = await buscarReasignacionEspacio(evt, espacioExistente);
+              const aiResult = await generarReasignacionInhabilitacion({ evento: evt, espacioOriginal: espacioExistente, candidatos, motivoInhabilitacion: motivo });
+              
+              await tx.evento.update({
+                where: { id: evt.id },
+                data: {
+                  estado: 'PROPUESTA_CAMBIO',
+                  espacioSugeridoId: aiResult.espacioPropuestoId,
+                  fechaSugerida: aiResult.fechaPropuesta,
+                  horaInicioSugerida: aiResult.horaInicioPropuesta,
+                  horaFinSugerida: aiResult.horaFinPropuesta,
+                  motivoPropuesta: motivo,
+                  sugerenciaIA: aiResult.sugerencia
+                }
+              });
+           } else {
+              // MANTENIMIENTO simple cancellation
+              await tx.evento.update({
+                where: { id: evt.id },
+                data: {
+                  estado: 'CANCELADO',
+                  sugerenciaIA: `Cancelado por contingencia de espacio (${estado}): ${motivo}`
+                }
+              });
+           }
+        }
+      }
+
+      // 3. Registrar auditoría inmutable
+      await tx.auditoria.create({
+        data: {
+          usuarioId: coordinator.id,
+          accion: 'CAMBIO_ESTADO_ESPACIO',
+          detalles: `Coordinador ${coordinator.nombre} cambió el estado de "${espacioExistente.nombre}" de ${espacioExistente.estado} a ${estado}.${motivo ? ` Motivo: ${motivo}.` : ''} Eventos afectados: ${eventosProcesadosCount}.`
+        }
+      });
+
+      return { espacioActualizado, eventosProcesadosCount };
+    });
+
+    // Notificar por correo a los usuarios afectados (fuera de la transacción para no bloquear)
+    if (['MANTENIMIENTO', 'INHABILITADO'].includes(estado) && eventosAfectados.length > 0) {
+      for (const evt of eventosAfectados) {
+        if (estado === 'INHABILITADO') {
+            const eventoPropuesta = await prisma.evento.findUnique({ where: { id: evt.id }, include: { espacioSugerido: true } });
+            if (sendReassignmentProposalNotification) {
+               sendReassignmentProposalNotification({
+                  email: evt.usuario.email,
+                  usuarioNombre: evt.usuario.nombre,
+                  eventoTitulo: evt.titulo,
+                  espacioOriginalNombre: espacioExistente.nombre,
+                  espacioPropuestoNombre: eventoPropuesta.espacioSugerido ? eventoPropuesta.espacioSugerido.nombre : null,
+                  sugerenciaIA: eventoPropuesta.sugerenciaIA,
+                  linkRespuesta: `${process.env.FRONTEND_URL}/eventos/${evt.id}/responder-propuesta`
+               }).catch(err => console.error(`[EspacioCtrl] Error al enviar notificación de propuesta a ${evt.usuario.email}:`, err));
+            }
+        } else {
+            const fechaStr = new Date(evt.fecha).toISOString().split('T')[0];
+            sendSpaceMaintenanceNotification({
+              email: evt.usuario.email,
+              usuarioNombre: evt.usuario.nombre,
+              eventoTitulo: evt.titulo,
+              espacioNombre: espacioExistente.nombre,
+              fecha: fechaStr,
+              horaInicio: evt.horaInicio,
+              horaFin: evt.horaFin,
+              motivo
+            }).catch(err => console.error(`[EspacioCtrl] Error al enviar notificación a ${evt.usuario.email}:`, err));
+        }
+      }
+    }
+
+    return res.status(200).json({
+      message: `El estado del espacio "${espacioExistente.nombre}" fue actualizado a ${estado}.`,
+      espacio: result.espacioActualizado,
+      eventosAfectadosCount: result.eventosProcesadosCount
+    });
+  } catch (error) {
+    console.error('[EspacioCtrl] Error al actualizar estado del espacio:', error);
+    return res.status(500).json({ error: 'Error interno al actualizar el estado del espacio.' });
+  }
+}

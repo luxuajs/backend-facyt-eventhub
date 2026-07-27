@@ -6,7 +6,10 @@ import {
   inviteCoordinator,
   confirmInvite,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  getCoordinators,
+  requestDeleteCoordinator,
+  confirmDeleteCoordinator
 } from '../controllers/authController.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.js';
 
@@ -22,5 +25,8 @@ router.post('/reset-password', resetPassword);
 
 // Rutas Protegidas (Solo ROOT)
 router.post('/invite-coordinator', authenticateToken, requireRole(['ROOT']), inviteCoordinator);
+router.get('/coordinators', authenticateToken, requireRole(['ROOT']), getCoordinators);
+router.post('/request-delete-coordinator', authenticateToken, requireRole(['ROOT']), requestDeleteCoordinator);
+router.post('/confirm-delete-coordinator', authenticateToken, requireRole(['ROOT']), confirmDeleteCoordinator);
 
 export default router;

@@ -5,7 +5,8 @@ import prisma from '../config/db.js';
 import {
   sendVerificationCode,
   sendCoordinatorInvitation,
-  sendResetPasswordCode
+  sendResetPasswordCode,
+  sendDeleteCoordinatorCode
 } from '../services/emailService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_facyt_2026';
@@ -358,3 +359,141 @@ export async function resetPassword(req, res) {
     return res.status(500).json({ error: 'Error interno del servidor al restablecer contraseña.' });
   }
 }
+
+// Obtener todos los coordinadores (ROOT only)
+export async function getCoordinators(req, res) {
+  try {
+    const coordinadores = await prisma.usuario.findMany({
+      where: { rol: 'COORDINADOR' },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        activo: true,
+        createdAt: true,
+        escuela: {
+          select: {
+            id: true,
+            nombre: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return res.status(200).json(coordinadores);
+  } catch (error) {
+    console.error('[AuthCtrl] Error al obtener coordinadores:', error);
+    return res.status(500).json({ error: 'Error al obtener la lista de coordinadores.' });
+  }
+}
+
+// Solicitar código de confirmación para eliminar un coordinador (ROOT only)
+export async function requestDeleteCoordinator(req, res) {
+  const { coordinadorId } = req.body;
+
+  if (!coordinadorId) {
+    return res.status(400).json({ error: 'El ID del coordinador es requerido.' });
+  }
+
+  try {
+    const coordinador = await prisma.usuario.findFirst({
+      where: { id: coordinadorId, rol: 'COORDINADOR' }
+    });
+
+    if (!coordinador) {
+      return res.status(404).json({ error: 'El coordinador no existe o no tiene rol de coordinador.' });
+    }
+
+    // Generar código de 6 dígitos
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+    const tipo = `ELIMINAR_COORDINADOR_${coordinadorId}`;
+
+    // Limpiar códigos anteriores de eliminación para este coordinador y ROOT
+    await prisma.resetCode.deleteMany({
+      where: {
+        email: req.user.email,
+        tipo
+      }
+    });
+
+    await prisma.resetCode.create({
+      data: {
+        email: req.user.email,
+        code,
+        tipo,
+        expiresAt
+      }
+    });
+
+    // Enviar código por correo al usuario ROOT
+    await sendDeleteCoordinatorCode(req.user.email, coordinador.nombre, code);
+
+    return res.status(200).json({
+      message: `Código de confirmación enviado al correo del ROOT (${req.user.email}).`
+    });
+  } catch (error) {
+    console.error('[AuthCtrl] Error al solicitar eliminación de coordinador:', error);
+    return res.status(500).json({ error: 'Error al procesar la solicitud de eliminación.' });
+  }
+}
+
+// Confirmar eliminación de coordinador con el código enviado por email (ROOT only)
+export async function confirmDeleteCoordinator(req, res) {
+  const { coordinadorId, code } = req.body;
+
+  if (!coordinadorId || !code) {
+    return res.status(400).json({ error: 'El ID del coordinador y el código son requeridos.' });
+  }
+
+  try {
+    const coordinador = await prisma.usuario.findFirst({
+      where: { id: coordinadorId, rol: 'COORDINADOR' }
+    });
+
+    if (!coordinador) {
+      return res.status(404).json({ error: 'El coordinador no existe.' });
+    }
+
+    const tipo = `ELIMINAR_COORDINADOR_${coordinadorId}`;
+
+    const validCode = await prisma.resetCode.findFirst({
+      where: {
+        email: req.user.email,
+        code,
+        tipo,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    if (!validCode) {
+      return res.status(400).json({ error: 'Código de confirmación inválido o expirado.' });
+    }
+
+    // Transacción para eliminar registros dependientes y el usuario
+    await prisma.$transaction(async (tx) => {
+      await tx.resetCode.deleteMany({ where: { email: coordinador.email } });
+      await tx.resetCode.delete({ where: { id: validCode.id } });
+      
+      await tx.auditoria.deleteMany({ where: { usuarioId: coordinador.id } });
+      await tx.evento.deleteMany({ where: { usuarioId: coordinador.id } });
+
+      await tx.usuario.delete({ where: { id: coordinador.id } });
+
+      await tx.auditoria.create({
+        data: {
+          usuarioId: req.user.id,
+          accion: 'ELIMINO_COORDINADOR',
+          detalles: `Eliminó la cuenta del coordinador ${coordinador.nombre} (${coordinador.email}) mediante código de confirmación enviado por correo.`
+        }
+      });
+    });
+
+    return res.status(200).json({ message: 'Coordinador eliminado con éxito.' });
+  } catch (error) {
+    console.error('[AuthCtrl] Error al confirmar eliminación de coordinador:', error);
+    return res.status(500).json({ error: 'Error interno del servidor al eliminar coordinador.' });
+  }
+}
+
