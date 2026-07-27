@@ -32,20 +32,24 @@ app.use('/api/espacios', espacioRoutes);
 app.use('/api/areas', areaRoutes);
 app.use('/api/materias', materiaRoutes);
 
-// Endpoint de verificación de salud
+import fs from 'fs';
+
+// Endpoint raíz y verificación de salud
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'FaCyT EventHub API Online' });
+});
+
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'UP', timestamp: new Date() });
 });
 
-// Soporte para servir el frontend de React en producción
+// Soporte para servir el frontend de React solo si la carpeta dist existe localmente
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const distPath = path.join(__dirname, '../../frontend/dist');
 
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, '../../frontend/dist');
+if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  
-  // Capturar cualquier ruta que no sea de la API y servir el index.html de React
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
