@@ -1,32 +1,43 @@
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 465,
-  secure: process.env.EMAIL_PORT === '465' || (!process.env.EMAIL_PORT && true), // true si es 465 o si no se define
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-// Función auxiliar para enviar correos
+// Función auxiliar para enviar correos usando la API HTTP de Resend
 async function sendMail({ to, subject, html }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const fromEmail = process.env.EMAIL_FROM || 'onboarding@resend.dev'; // Remitente por defecto de Resend
+
+  if (!apiKey) {
+    console.error('[Email] Error: RESEND_API_KEY no está configurada.');
+    throw new Error('Servicio de correo no configurado.');
+  }
+
   try {
-    const info = await transporter.sendMail({
-      from: `"FaCyT EventHub" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `FaCyT EventHub <${fromEmail}>`,
+        to: [to],
+        subject: subject,
+        html: html,
+      }),
     });
-    console.log(`[Email] Correo enviado a ${to}. ID: ${info.messageId}`);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('[Email] Error en la API de Resend:', data);
+      throw new Error(data.message || 'Error al enviar el correo transaccional');
+    }
+
+    console.log(`[Email] Correo enviado a ${to} a través de Resend. ID: ${data.id}`);
     return true;
   } catch (error) {
-    console.error('[Email] Error enviando correo SMTP:', error);
-    // Lanzar error capturable por el controlador para retornar HTTP 503
+    console.error('[Email] Error enviando correo vía Resend API:', error.message);
     throw new Error('Error al enviar el correo transaccional');
   }
 }
@@ -132,7 +143,7 @@ export async function sendDeleteCoordinatorCode(email, coordinatorName, code) {
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #dc2626; text-align: center;">Confirmación de Eliminación de Coordinador</h2>
       <p>Hola,</p>
-      <p>Se ha solicitado la eliminación del perfil del coordinador <strong>${coordinatorName}</strong> en FaCyT EventHub.</p>
+      <p>Se ha solicitado la eliminación del perfil del coordinator <strong>${coordinatorName}</strong> en FaCyT EventHub.</p>
       <p>Para confirmar esta acción, ingresa el siguiente código de confirmación de 6 dígitos en el sistema. Este código expira en 15 minutos:</p>
       <div style="text-align: center; margin: 30px 0;">
         <span style="font-family: monospace; font-size: 32px; font-weight: bold; letter-spacing: 5px; background-color: #fef2f2; padding: 10px 20px; border-radius: 6px; border: 1px solid #fca5a5; color: #991b1b;">${code}</span>
@@ -177,4 +188,3 @@ export async function sendReassignmentProposalNotification({ email, usuarioNombr
     console.error(`[Email] No se pudo enviar notificación de propuesta a ${email}:`, error.message);
   }
 }
-
