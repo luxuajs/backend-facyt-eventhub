@@ -1,43 +1,35 @@
+import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Función auxiliar para enviar correos usando la API HTTP de Resend
-async function sendMail({ to, subject, html }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || 'onboarding@resend.dev'; // Remitente por defecto de Resend
-
-  if (!apiKey) {
-    console.error('[Email] Error: RESEND_API_KEY no está configurada.');
-    throw new Error('Servicio de correo no configurado.');
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.EMAIL_PORT) || 465,
+  secure: process.env.EMAIL_PORT === '465', // true para 465, false para otros puertos (como 2525 u 80 con STARTTLS)
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  tls: {
+    // Evita errores de handshake en algunos servidores en la nube
+    rejectUnauthorized: false
   }
+});
 
+// Función auxiliar para enviar correos
+async function sendMail({ to, subject, html }) {
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `FaCyT EventHub <${fromEmail}>`,
-        to: [to],
-        subject: subject,
-        html: html,
-      }),
+    const info = await transporter.sendMail({
+      from: `"FaCyT EventHub" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('[Email] Error en la API de Resend:', data);
-      throw new Error(data.message || 'Error al enviar el correo transaccional');
-    }
-
-    console.log(`[Email] Correo enviado a ${to} a través de Resend. ID: ${data.id}`);
+    console.log(`[Email] Correo enviado a ${to}. ID: ${info.messageId}`);
     return true;
   } catch (error) {
-    console.error('[Email] Error enviando correo vía Resend API:', error.message);
+    console.error('[Email] Error enviando correo SMTP:', error);
     throw new Error('Error al enviar el correo transaccional');
   }
 }
