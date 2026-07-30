@@ -602,7 +602,7 @@ export async function editarEvento(req, res) {
 
     const eventoExistente = await prisma.evento.findUnique({
       where: { id },
-      include: { espacio: true }
+      include: { espacio: true, usuario: true }
     });
 
     if (!eventoExistente) {
@@ -635,7 +635,7 @@ export async function editarEvento(req, res) {
     // Validación de capacidad con IA
     if (numAsistentes > espacioObj.capacidad) {
       const espaciosCompatibles = await findAlternativeSpacesForCapacity(
-        user,
+        eventoExistente.usuario,
         espacioObj,
         tipo,
         numAsistentes,
@@ -665,7 +665,7 @@ export async function editarEvento(req, res) {
     let espacio;
     try {
       espacio = await validateRequest(
-        user,
+        eventoExistente.usuario,
         espacioId,
         tipo,
         numAsistentes,
