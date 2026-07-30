@@ -578,13 +578,14 @@ export async function getEscuelas(req, res) {
   }
 }
 
-// Editar datos de un evento (Solicitante propietario o Coordinador/ROOT)
 export async function editarEvento(req, res) {
   const { id } = req.params;
   const {
     titulo,
     descripcion,
     tipo,
+    carrera,
+    materia,
     fecha,
     horaInicio,
     horaFin,
@@ -759,6 +760,7 @@ export async function editarEvento(req, res) {
           titulo,
           descripcion,
           tipo,
+          materia: materia || null,
           prioridad,
           fecha: targetDate,
           horaInicio,
