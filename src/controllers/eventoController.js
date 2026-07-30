@@ -817,6 +817,15 @@ export async function obtenerPromocionEvento(req, res) {
       return res.status(404).json({ error: 'Evento no encontrado.' });
     }
 
+    // Verificar permisos: Propietario o rol de administración/coordinación
+    const user = req.user;
+    const esPropietario = evento.usuarioId === user.id;
+    const esCoordinadorOAdmin = ['COORDINADOR', 'ROOT', 'ADMINISTRADOR'].includes(user.rol);
+
+    if (!esPropietario && !esCoordinadorOAdmin) {
+      return res.status(403).json({ error: 'No tienes permisos para promocionar este evento. Solo el solicitante creador o los coordinadores/administradores están autorizados.' });
+    }
+
     if (evento.estado !== 'APROBADO') {
       return res.status(400).json({ error: 'Solo se pueden promocionar eventos que hayan sido APROBADOS.' });
     }
