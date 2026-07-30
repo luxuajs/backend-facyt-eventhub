@@ -390,7 +390,7 @@ export async function proponerCambioEspacio(req, res) {
     });
 
     // Enviar notificación por correo al solicitante afectado (fuera de la transacción)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://frontend-facyt-eventhub.vercel.app';
     sendReassignmentProposalNotification({
       email: evento.usuario.email,
       usuarioNombre: evento.usuario.nombre,

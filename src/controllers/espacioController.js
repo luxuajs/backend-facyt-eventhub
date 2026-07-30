@@ -192,7 +192,7 @@ export async function actualizarEstadoEspacio(req, res) {
 
         if (eventoActualizado.estado === 'PROPUESTA_CAMBIO') {
             if (sendReassignmentProposalNotification) {
-               const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+               const frontendUrl = process.env.FRONTEND_URL || 'https://frontend-facyt-eventhub.vercel.app';
                sendReassignmentProposalNotification({
                   email: evt.usuario.email,
                   usuarioNombre: evt.usuario.nombre,
