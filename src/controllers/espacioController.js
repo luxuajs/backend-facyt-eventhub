@@ -192,6 +192,7 @@ export async function actualizarEstadoEspacio(req, res) {
 
         if (eventoActualizado.estado === 'PROPUESTA_CAMBIO') {
             if (sendReassignmentProposalNotification) {
+               const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
                sendReassignmentProposalNotification({
                   email: evt.usuario.email,
                   usuarioNombre: evt.usuario.nombre,
@@ -199,7 +200,7 @@ export async function actualizarEstadoEspacio(req, res) {
                   espacioOriginalNombre: espacioExistente.nombre,
                   espacioPropuestoNombre: eventoActualizado.espacioSugerido ? eventoActualizado.espacioSugerido.nombre : null,
                   sugerenciaIA: eventoActualizado.sugerenciaIA,
-                  linkRespuesta: `${process.env.FRONTEND_URL}/eventos/${evt.id}/responder-propuesta`
+                  linkRespuesta: `${frontendUrl}/eventos/${evt.id}/responder-propuesta`
                }).catch(err => console.error(`[EspacioCtrl] Error al enviar notificación de propuesta a ${evt.usuario.email}:`, err));
             }
         } else {
