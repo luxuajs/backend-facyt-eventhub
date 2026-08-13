@@ -502,3 +502,39 @@ export async function confirmDeleteCoordinator(req, res) {
   }
 }
 
+// Reseteo total de la BD a estado inicial desde cero (ROOT only)
+export async function resetDatabase(req, res) {
+  try {
+    const rootEmail = 'juansanabriaalfa08@gmail.com';
+
+    await prisma.$transaction(async (tx) => {
+      await tx.asistencia.deleteMany({});
+      await tx.auditoria.deleteMany({});
+      await tx.evento.deleteMany({});
+      await tx.resetCode.deleteMany({});
+      await tx.usuario.deleteMany({
+        where: {
+          email: { not: rootEmail }
+        }
+      });
+
+      // Crear auditoría del reseteo
+      const rootUser = await tx.usuario.findUnique({ where: { email: rootEmail } });
+      if (rootUser) {
+        await tx.auditoria.create({
+          data: {
+            usuarioId: rootUser.id,
+            accion: 'RESETEO_BASE_DE_DATOS',
+            detalles: `El usuario ROOT ${rootUser.nombre} reinició la base de datos a cero.`
+          }
+        });
+      }
+    });
+
+    return res.status(200).json({ message: 'Base de datos reiniciada a cero con éxito. Solo se ha mantenido la cuenta ROOT.' });
+  } catch (error) {
+    console.error('[AuthCtrl] Error al reiniciar base de datos:', error);
+    return res.status(500).json({ error: 'Error al reiniciar la base de datos.' });
+  }
+}
+

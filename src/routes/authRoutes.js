@@ -9,7 +9,8 @@ import {
   resetPassword,
   getCoordinators,
   requestDeleteCoordinator,
-  confirmDeleteCoordinator
+  confirmDeleteCoordinator,
+  resetDatabase
 } from '../controllers/authController.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.js';
 
@@ -28,5 +29,6 @@ router.post('/invite-coordinator', authenticateToken, requireRole(['ROOT']), inv
 router.get('/coordinators', authenticateToken, requireRole(['ROOT']), getCoordinators);
 router.post('/request-delete-coordinator', authenticateToken, requireRole(['ROOT']), requestDeleteCoordinator);
 router.post('/confirm-delete-coordinator', authenticateToken, requireRole(['ROOT']), confirmDeleteCoordinator);
+router.post('/reset-database', authenticateToken, requireRole(['ROOT']), resetDatabase);
 
 export default router;
