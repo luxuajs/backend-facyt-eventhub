@@ -50,3 +50,27 @@ export function requireRole(allowedRoles) {
     next();
   };
 }
+
+export async function optionalAuthenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await prisma.usuario.findUnique({
+      where: { id: decoded.id },
+      include: { escuela: true }
+    });
+
+    if (user && user.activo) {
+      req.user = user;
+    }
+    next();
+  } catch (error) {
+    next();
+  }
+}

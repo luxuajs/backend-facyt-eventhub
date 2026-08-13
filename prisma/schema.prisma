@@ -13,6 +13,13 @@ enum Rol {
   SOLICITANTE
 }
 
+enum TipoUsuario {
+  COORDINADOR
+  PROFESOR
+  ESTUDIANTE
+  GRUPO_EXTERNO
+}
+
 enum TipoEspacio {
   AUDITORIO
   LABORATORIO_DOCENCIA
@@ -35,17 +42,19 @@ enum EstadoEvento {
 }
 
 model Usuario {
-  id         String      @id @default(uuid())
-  nombre     String
-  email      String      @unique
-  password   String
-  rol        Rol         @default(SOLICITANTE)
-  activo     Boolean     @default(false)
-  escuelaId  String?
-  escuela    Escuela?    @relation(fields: [escuelaId], references: [id])
-  eventos    Evento[]
-  auditorias Auditoria[]
-  createdAt  DateTime    @default(now())
+  id          String       @id @default(uuid())
+  nombre      String
+  email       String       @unique
+  password    String
+  rol         Rol          @default(SOLICITANTE)
+  tipoUsuario TipoUsuario  @default(ESTUDIANTE)
+  activo      Boolean      @default(false)
+  escuelaId   String?
+  escuela     Escuela?     @relation(fields: [escuelaId], references: [id])
+  eventos     Evento[]
+  auditorias  Auditoria[]
+  asistencias Asistencia[]
+  createdAt   DateTime     @default(now())
 }
 
 model Escuela {
@@ -123,8 +132,20 @@ model Evento {
   horaFinSugerida     String?
   usuarioId           String
   usuario             Usuario      @relation(fields: [usuarioId], references: [id])
+  asistencias         Asistencia[]
   
   createdAt           DateTime     @default(now())
+}
+
+model Asistencia {
+  id        String   @id @default(uuid())
+  eventoId  String
+  evento    Evento   @relation(fields: [eventoId], references: [id])
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([eventoId, usuarioId])
 }
 
 model Auditoria {

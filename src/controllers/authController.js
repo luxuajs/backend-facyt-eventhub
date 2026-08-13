@@ -13,7 +13,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_facyt_2026';
 
 // Registro de Solicitante
 export async function register(req, res) {
-  const { nombre, email, password, escuelaId } = req.body;
+  const { nombre, email, password, escuelaId, tipoUsuario: rawTipoUsuario } = req.body;
 
   if (!nombre || !email || !password) {
     return res.status(400).json({ error: 'Nombre, email y contraseña son campos obligatorios.' });
@@ -29,13 +29,17 @@ export async function register(req, res) {
     // Hashear la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const tipoUsuario = rawTipoUsuario || 'ESTUDIANTE';
+    const rol = tipoUsuario === 'COORDINADOR' ? 'COORDINADOR' : 'SOLICITANTE';
+
     // Crear el usuario inactivo (esperando confirmación)
     const user = await prisma.usuario.create({
       data: {
         nombre,
         email,
         password: hashedPassword,
-        rol: 'SOLICITANTE',
+        rol,
+        tipoUsuario,
         activo: false,
         escuelaId: escuelaId || null
       }
@@ -154,6 +158,7 @@ export async function login(req, res) {
         nombre: user.nombre,
         email: user.email,
         rol: user.rol,
+        tipoUsuario: user.tipoUsuario,
         escuela: user.escuela ? { id: user.escuela.id, nombre: user.escuela.nombre } : null
       }
     });

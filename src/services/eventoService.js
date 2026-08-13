@@ -230,6 +230,24 @@ export async function validateRequest(usuario, espacioId, tipo, asistentesEstima
     throw new Error(`El espacio solicitado no está activo (Estado actual: ${espacio.estado}).`);
   }
 
+  // Validación de restricciones de espacio según usuario.tipoUsuario
+  if (usuario) {
+    const tipoUsuario = usuario.tipoUsuario;
+    const rol = usuario.rol;
+
+    if (rol !== 'ROOT' && tipoUsuario !== 'PROFESOR' && tipoUsuario !== 'COORDINADOR') {
+      if (tipoUsuario === 'ESTUDIANTE') {
+        if (espacio.tipo !== 'SALON') {
+          throw new Error('Los estudiantes solo tienen permitido reservar Aulas de Clases Teóricas.');
+        }
+      } else if (tipoUsuario === 'GRUPO_EXTERNO') {
+        if (espacio.tipo !== 'SALON' && espacio.tipo !== 'AUDITORIO') {
+          throw new Error('Los Grupos Externos solo tienen permitido reservar el Auditorio Ninoska Maneiro o Aulas de Clases Teóricas.');
+        }
+      }
+    }
+  }
+
   // 1. Validación de capacidad para cualquier tipo de evento
   if (asistentesEstimados > espacio.capacidad) {
     throw new Error(`La capacidad del salón (${espacio.capacidad}) es insuficiente para los asistentes estimados (${asistentesEstimados}).`);
