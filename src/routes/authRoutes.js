@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   register,
   verifyCode,
+  resendVerificationCode,
   login,
   inviteCoordinator,
   confirmInvite,
@@ -19,6 +20,7 @@ const router = Router();
 // Rutas Públicas
 router.post('/register', register);
 router.post('/verify-code', verifyCode);
+router.post('/resend-verification-code', resendVerificationCode);
 router.post('/login', login);
 router.post('/confirm-invite', confirmInvite);
 router.post('/forgot-password', forgotPassword);

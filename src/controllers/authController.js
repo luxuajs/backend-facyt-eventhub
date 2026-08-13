@@ -117,6 +117,56 @@ export async function verifyCode(req, res) {
   }
 }
 
+// Reenviar código de verificación de registro
+export async function resendVerificationCode(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'El correo electrónico es obligatorio.' });
+  }
+
+  try {
+    const user = await prisma.usuario.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: 'No existe una cuenta registrada con este correo.' });
+    }
+
+    if (user.activo) {
+      return res.status(400).json({ error: 'Esta cuenta ya ha sido activada previa e íntegramente. Puedes iniciar sesión.' });
+    }
+
+    // Limpiar códigos anteriores de verificación
+    await prisma.resetCode.deleteMany({
+      where: { email, tipo: 'VERIFICACION' }
+    });
+
+    // Generar nuevo código de 6 dígitos
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+
+    await prisma.resetCode.create({
+      data: {
+        email,
+        code: verificationCode,
+        tipo: 'VERIFICACION',
+        expiresAt
+      }
+    });
+
+    try {
+      await sendVerificationCode(email, verificationCode);
+    } catch (mailError) {
+      console.error('[AuthCtrl] Error al reenviar correo de verificación:', mailError.message);
+      return res.status(503).json({ error: 'Error al enviar el correo transaccional.' });
+    }
+
+    return res.status(200).json({ message: 'Nuevo código de verificación enviado a tu correo.' });
+  } catch (error) {
+    console.error('[AuthCtrl] Error en resendVerificationCode:', error);
+    return res.status(500).json({ error: 'Error interno al reenviar el código.' });
+  }
+}
+
 // Iniciar sesión
 export async function login(req, res) {
   const { email, password } = req.body;
